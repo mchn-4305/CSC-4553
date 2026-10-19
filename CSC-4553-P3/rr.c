@@ -43,12 +43,12 @@ static thread rr_next() {
     return t;
 }
 
-static int rr_count() {
+static int rr_qlen() {
     return thread_count;
 }
 
 struct scheduler rr_scheduler = {
-    NULL, NULL, rr_admit, rr_remove, rr_next, rr_count
+    NULL, NULL, rr_admit, rr_remove, rr_next, rr_qlen
 };
 
 scheduler RoundRobin = &rr_scheduler;
