@@ -4,31 +4,31 @@
 static thread head = NULL;
 static int thread_count = 0;
 
-static void rr_admit(thread t) {
+static void rr_admit(thread new) {
   if (head == NULL) {
-    head = t;
-    t->sched_one = t->sched_two = t;
+    head = new;
+    new->sched_one = new->sched_two = new;
     } else {
         thread tail = head->sched_two;
-        tail->sched_one = t;
-        t->sched_two = tail;
-        t->sched_one = head;
-        head->sched_two = t;
+        tail->sched_one = new;
+        new->sched_two = tail;
+        new->sched_one = head;
+        head->sched_two = new;
     }
     thread_count++;
 }
 
-static void rr_remove(thread t) {
+static void rr_remove(thread victim) {
     if (thread_count == 0) {
         return;
     }
     if (thread_count == 1) {
         head = NULL;
     } else {
-        t->sched_two->sched_one = t->sched_one;
-        t->sched_one->sched_two = t->sched_two;
-        if (head == t) {
-            head = t->sched_one;
+        victim->sched_two->sched_one = victim->sched_one;
+        victim->sched_one->sched_two = victim->sched_two;
+        if (head == victim) {
+            head = victim->sched_one;
         }
     }
     thread_count--;
