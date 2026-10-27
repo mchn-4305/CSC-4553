@@ -107,7 +107,7 @@ static void set_timer(long ms, long interval_ms) {
 static void run_slice(Process *p, long quantum) {
     current_pid = p->pid;
     slice_result = SLICE_RUNNING;
-    set_timer(quantum, quantum);
+    set_timer(quantum, 0);
     kill(p->pid, SIGCONT);
 
     while (slice_result == SLICE_RUNNING) {
@@ -207,9 +207,14 @@ int main(int argc, char *argv[]) {
 
     free(line);
     fclose(file);
-    
-    // setup_sigs();
-    // create_all_processes(head);
+
+    setup_sigs();
+    create_all_processes(head);
+
+    // test line, delete after
+    printf("All processes successfully created.\n");
+    // test line, delete after
+    return 0;
 
     Process *priority_group = head;
     while (priority_group != NULL) {
@@ -236,7 +241,5 @@ int main(int argc, char *argv[]) {
         priority_group = end;
     }
 
-    
-    
     return 0;
 }
