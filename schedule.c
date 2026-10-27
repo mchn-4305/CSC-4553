@@ -19,7 +19,8 @@
 
 static volatile pid_t current_pid = 0;
 static volatile sig_atomic_t slice_result = SLICE_RUNNING;
-
+static sigset_t schedule_sigs;
+static sigset_t normal_mask;
 
 //Pause child if quantum runs out
 static void on_alarm(int sig) {
@@ -59,14 +60,24 @@ static void setup_sigs(void) {
     sa.sa_flags = SA_RESTART;
 
     sa.sa_handler = on_alarm;
-    sigaction(SIGALRM, &sa, NULL);
+    if (sigaction(SIGALRM, &sa, NULL) == -1) {
+        perror("sigaction SIGALRM");
+        exit(EXIT_FAILURE);
+    }
+    
     sa.sa_handler = on_child;
-    sigaction(SIGCHLD, &sa, NULL);
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction SIGCHLD");
+        exit(EXIT_FAILURE);
+    }
 
     sigemptyset(&schedule_sigs);
     sigaddset(&schedule_sigs, SIGALRM);
     sigaddset(&schedule_sigs, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &schedule_sigs, NULL);
+    if (sigprocmask(SIG_BLOCK, &schedule_sigs, &normal_mask) == -1) {
+        perror("sigprocmask");
+        exit(EXIT_FAILURE);
+    }
 }
 
 //fork every child and waits
@@ -87,7 +98,27 @@ static void create_all_processes(Process *head) {
         }
 
         int status;
-        waitpid(pid, &status, WUNTRACED);
+        pid_t result;
+        do {
+            result = waitpid(pid, &status, WUNTRACED
+            );
+        } while (result == -1 && errno == EINTR);
+
+        if (result == -1) {
+            perror("waitpid");
+            exit(EXIT_FAILURE);
+        }
+
+        if (!WIFSTOPPED(status)) {
+            fprintf(
+                stderr,
+                "Process %d failed to enter stopped state\n",
+                p->id
+            );
+
+            exit(EXIT_FAILURE);
+        }
+
         p->pid = pid;
         p->stopped = 1;
     }
@@ -100,22 +131,24 @@ static void set_timer(long ms, long interval_ms) {
     t.it_value.tv_usec = (ms % 1000) * 1000;
     t.it_interval.tv_sec = interval_ms / 1000;
     t.it_interval.tv_usec = (interval_ms % 1000) * 1000;
-    setitimer(ITIMER_REAL, &t, NULL);
+    if (setitimer(ITIMER_REAL, &t, NULL) == -1) {
+        perror("setitimer");
+        exit(EXIT_FAILURE);
+    }
 }
 
 //Give one process one quantum
 static void run_slice(Process *p, long quantum) {
     current_pid = p->pid;
     slice_result = SLICE_RUNNING;
-    set_timer(quantum, quantum);
-    kill(p->pid, SIGCONT);
+    set_timer(quantum, 0);
+    if (kill(p->pid, SIGCONT) == -1) {
+        perror("kill SIGCONT");
+        return;
+    }
 
     while (slice_result == SLICE_RUNNING) {
-        sigprocmask(SIG_UNBLOCK, &schedule_sigs, NULL);
-        if (slice_result == SLICE_RUNNING) {
-            pause();
-        }
-        sigprocmask(SIG_BLOCK, &schedule_sigs, NULL);
+        sigsuspend(&normal_mask);
     }
 
     set_timer(0, 0);
@@ -236,7 +269,15 @@ int main(int argc, char *argv[]) {
         priority_group = end;
     }
 
-    
-    
+    Process *current = head;
+
+    while (current != NULL) {
+        Process *next = current->next;
+
+        free_process(current);
+
+        current = next;
+    }
+
     return 0;
 }
