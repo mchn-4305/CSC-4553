@@ -240,9 +240,14 @@ int main(int argc, char *argv[]) {
 
     free(line);
     fclose(file);
-    
-    // setup_sigs();
-    // create_all_processes(head);
+
+    setup_sigs();
+    create_all_processes(head);
+
+    // test line, delete after
+    printf("All processes successfully created.\n");
+    // test line, delete after
+    return 0;
 
     Process *priority_group = head;
     while (priority_group != NULL) {
