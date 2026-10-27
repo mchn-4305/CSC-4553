@@ -189,9 +189,8 @@ int main(int argc, char *argv[]) {
     }
 
     char *endptr;
-    errno = 0;
     long quantum = strtol(argv[1], &endptr, 10);
-    if (errno != 0 || endptr == argv[1] || *endptr != '\0' || quantum <= 0) {
+    if (endptr == argv[1] || *endptr != '\0' || quantum <= 0) {
         fprintf(stderr, "Invalid quantum: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
@@ -223,11 +222,27 @@ int main(int argc, char *argv[]) {
         );
     }
 
+    // Testing loop, delete after
+    for (Process *p = head; p != NULL; p = =->next) {
+        printf("id=%d priority=%d program =%s\n",
+            p->id,
+            p->priority,
+            p->program
+        );
+        for (int i = 0; i < p->argc; i++) {
+            printf(
+                "    argv[%d] = %s\n",
+                i,
+                p->argv[i]
+            );
+        }
+    }
+
     free(line);
     fclose(file);
-
-    setup_sigs();
-    create_all_processes(head);
+    
+    // setup_sigs();
+    // create_all_processes(head);
 
     Process *priority_group = head;
     while (priority_group != NULL) {
