@@ -8,6 +8,7 @@
 
 #include "lwp.h"
 #include "rr.h"
+#include "stack.h"
 
 // The currently executing LWP
 static thread current_thread = NULL;
