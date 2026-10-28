@@ -32,9 +32,14 @@ test_rr: tests/test_rr.c rr.o
 test_stack: tests/test_stack.c stack.o
 	$(CC) $(CFLAGS) -I. tests/test_stack.c stack.o -o test_stack
 
+test_create: tests/test_create.c lwp.o rr.o stack.o
+	$(CC) $(CFLAGS) -I. tests/test_create.c \
+	    lwp.o rr.o stack.o -o test_create
+
 test: test_rr test_stack
 	./test_rr
 	./test_stack
+	./test_create
 
 clean:
-	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack
+	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create
