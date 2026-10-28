@@ -36,10 +36,15 @@ test_create: tests/test_create.c lwp.o rr.o stack.o
 	$(CC) $(CFLAGS) -I. tests/test_create.c \
 	    lwp.o rr.o stack.o -o test_create
 
-test: test_rr test_stack
+test_basic: tests/test_basic.c lwp.o rr.o stack.o magic64.o
+	$(CC) $(CFLAGS) -I. tests/test_basic.c \
+	    lwp.o rr.o stack.o magic64.o -o test_basic
+
+test: test_rr test_stack test_create test_basic
 	./test_rr
 	./test_stack
 	./test_create
+	./test_basic
 
 clean:
-	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create
+	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create test_basic

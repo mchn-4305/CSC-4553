@@ -32,6 +32,39 @@ static thread all_threads = NULL;
 static thread terminated_head = NULL; // Oldest terminated thread
 static thread terminated_tail = NULL; // Newest terminated thread
 
+//FIFO queue of waiting thread
+static thread waiting_head = NULL; //Oldest waiting thread
+static thread waiting_tail = NULL; // Newest waiting thread
+
+
+// Helpers for waiting and terminated threads
+static void enqueue(thread *head, thread *tail, thread t) {
+    t->lib_two = NULL;
+
+    if (*tail != NULL) {
+        (*tail)->lib_two = t;
+    } else {
+        //empty queue
+        *head = t;
+    }
+    
+    *tail = t;
+}
+
+static thread dequeue(thread *head, thread *tail) {
+    thread t = *head;
+
+    if (t != NULL) {
+        *head = t->lib_two;
+        
+        // if queue is now empty
+        if (*head == NULL) {
+            *tail = NULL;
+        }
+        t->lib_two = NULL;
+    }
+    return t;
+}
 
 static void ensure_scheduler(void) {
     if (current_scheduler == NULL) {
@@ -119,3 +152,86 @@ tid_t lwp_create(lwpfun function, void *arg) {
 
     return new_thread->tid;
 }
+
+    void lwp_start(void) {
+        thread t;
+
+        // make sure original thread is the only one converted
+        if (main_thread != NULL) {
+            return;
+        }
+
+        t = calloc(1, sizeof(context));
+        if (t == NULL) {
+            return;
+        }
+        
+        // create context
+        t->tid = next_tid++;
+        t->stack = NULL;
+        t->stacksize = 0;
+        t->status = MKTERMSTAT(LWP_LIVE, 0);
+
+        // add to library's list of valid threads
+        t->lib_one = all_threads;
+
+        all_threads = t;
+        main_thread = t;
+        current_thread = t;
+
+        //ensure scheduler exists + admit original thread
+        ensure_scheduler();
+        current_scheduler->admit(t);
+    }
+
+    void lwp_yield(void) {
+        thread old_thread;
+        thread next_thread;
+
+        // lwp_start() has not run yet
+        if (current_thread == NULL) {
+            return;
+        }
+        old_thread = current_thread;
+        next_thread = current_scheduler->next();
+
+        // no runnable threads left
+        if (next_thread == NULL) {
+            exit(LWPTERMSTAT(old_thread->status));
+        }
+        
+        // scheduler returns same thread
+        if (next_thread == old_thread) {
+            return;
+        }
+
+        // context switch old thread and new thread
+        current_thread = next_thread;
+        swap_rfiles(&old_thread->state, &next_thread->state);
+    }
+
+    void lwp_exit(int exitval) {
+        thread waiting_thread;
+
+        if (current_thread == NULL) {
+            exit(exitval & 0xFF);
+        }
+
+        // mark terminated
+        current_thread->status = MKTERMSTAT(LWP_TERM, exitval);
+
+        // remove from scheduler
+        current_scheduler->remove(current_thread);
+
+        //check for waiting thread
+        waiting_thread = dequeue(&waiting_head, &waiting_tail);
+        if (waiting_thread != NULL) {
+            waiting_thread->exited = current_thread;
+            current_scheduler->admit(waiting_thread);
+        } else {
+            enqueue(&terminated_head, &terminated_tail, current_thread);
+        }
+
+        lwp_yield();
+        abort();
+    }
