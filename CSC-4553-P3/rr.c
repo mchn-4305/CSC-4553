@@ -30,7 +30,10 @@ static void rr_remove(thread victim) {
         if (head == victim) {
             head = victim->sched_one;
         }
+        
     }
+    victim->sched_one = NULL;
+    victim->sched_two = NULL;
     thread_count--;
 }
 
