@@ -129,7 +129,7 @@ tid_t lwp_create(lwpfun function, void *arg) {
     frame -= 3;
     frame[0] = 0; // saved rbp
     frame[1] = (unsigned long) (uintptr_t) lwp_wrap; // return address into lwp_wrap
-    frame[2] = (unsigned long) (uintptr_t) lwp_fallback; // fallback if lwp_warp returns
+    frame[2] = (unsigned long) (uintptr_t) lwp_fallback; // fallback if lwp_wrap returns
 
     // swap_rfiles() restores rbp and rsp
     // then executes leave; ret
@@ -182,6 +182,7 @@ tid_t lwp_create(lwpfun function, void *arg) {
         //ensure scheduler exists + admit original thread
         ensure_scheduler();
         current_scheduler->admit(t);
+        lwp_yield();
     }
 
     void lwp_yield(void) {
@@ -234,4 +235,92 @@ tid_t lwp_create(lwpfun function, void *arg) {
 
         lwp_yield();
         abort();
+    }
+
+    tid_t lwp_gettid(void) {
+        if (current_thread == NULL) {
+            return NO_THREAD;
+        }
+        return current_thread->tid;
+    }
+
+    thread tid2thread(tid_t tid) {
+        if (tid == NO_THREAD) {
+            return NULL;
+        }
+
+        thread current = all_threads;
+        while (current != NULL) {
+            if (current->tid == tid) {
+                return current;
+            }
+            current = current->lib_one;
+        }
+
+        return NULL;
+    }
+
+    static void remove_from_all_threads(thread victim) {
+        thread *current = &all threads;
+        while (*current != NULL) {
+            if (*current == victim) {
+                *current = victim->lib_one;
+                victim->lib_one = NULL;
+                return;
+            }
+
+            current = &(*current)->lib_one;
+        }
+    }
+
+    tid_t lwp_wait(int *status) {
+        thread finished;
+
+        // No active LWP can wait
+        if (current_thread == NULL) {
+            return NO_THREAD;
+        }
+
+        // A terminated thread is already available
+        finished = dequeue(&terminated_head, &terminated_tail);
+
+        if (finished == NULL) {
+            // No thread has terminated yet
+            // check whether another runnable thread
+            // could eventually terminate
+            if (current_scheduler->qlen() <= 1) {
+                return NO_THREAD;
+            }
+
+            // remove the calling thread form the runnable scheduler
+            current_scheduler->remove(current_thread);
+            // place it at end of waiting queue
+            current_thread->exited = NULL;
+            enqueue(&waiting_head, &waiting_tail, current_thread);
+
+            // switch to another thread
+            lwp_yield();
+            finished = current_thread->exited;
+            current_thread->exited = NULL;
+            if (finished == NULL) {
+                return NO_THREAD;
+            }
+        }
+
+        // Thread has been terminated either from queue or waiter wakeup
+        tid_t finished_tid = finished->tid;
+        if(status != NULL) {
+            *status = (int)finished->status;
+        }
+
+        // Remove terminated context from global
+        remove_from_all_threads(finished);
+
+        // Free stack if allocated
+        if (finished->stack != NULL) {
+            free_stack(finished->stack, finished->stacksize);
+        }
+        
+        free(finished);
+        return finished_tid;
     }

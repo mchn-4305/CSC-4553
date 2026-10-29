@@ -40,11 +40,16 @@ test_basic: tests/test_basic.c lwp.o rr.o stack.o magic64.o
 	$(CC) $(CFLAGS) -I. tests/test_basic.c \
 	    lwp.o rr.o stack.o magic64.o -o test_basic
 
-test: test_rr test_stack test_create test_basic
+test_wait: tests/test_wait.c lwp.o rr.o stack.o magic64.o
+	$(CC) $(CFLAGS) -I. tests/test_wait.c \
+	    lwp.o rr.o stack.o magic64.o -o test_wait
+
+test: test_rr test_stack test_create test_basic test_wait
 	./test_rr
 	./test_stack
 	./test_create
 	./test_basic
+	./test_wait
 
 clean:
-	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create test_basic
+	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create test_basic test_wait
