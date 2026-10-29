@@ -324,3 +324,53 @@ tid_t lwp_create(lwpfun function, void *arg) {
         free(finished);
         return finished_tid;
     }
+
+    scheduler lwp_get_scheduler(void) {
+        ensure_scheduler();
+        return current_scheduler;
+    }
+
+    void lwp_set_scheduler(scheduler sched) {
+        scheduler old_sched;
+        scheduler new_sched;
+        thread t;
+
+        // Make sure default exists
+        ensure_scheduler();
+        old_sched = current_scheduler;
+
+        // NULL means switch back to default RR
+        if (sched == NULL) {
+            new_sched = RoundRobin;
+        } else {
+            new_sched = sched;
+        }
+
+        // return if requested sched is active
+        if (new_sched == old_sched) {
+            return;
+        }
+
+        // initialize new scheduler
+        if (new_sched->init != NULL) {
+            new_sched->init();
+        }
+
+        // transfer threads
+        while (old_sched->qlen() > 0) {
+            t = old_sched->next();
+            if (t == NULL ){
+                abort();
+            }
+            old_sched->remove(t);
+            new_sched->admit(t);
+        }
+
+        // shut down old
+        if (old_sched->shutdown != NULL) {
+            old_sched->shutdown();
+        }
+
+        // publish new
+        current_scheduler = new_sched;
+    }
