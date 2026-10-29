@@ -52,7 +52,11 @@ test_scheduler: tests/test_scheduler.c lwp.o rr.o stack.o magic64.o
 	$(CC) $(CFLAGS) -I. tests/test_scheduler.c \
 	    lwp.o rr.o stack.o magic64.o -o test_scheduler
 
-test: test_rr test_stack test_create test_basic test_tid test_wait test_scheduler
+test_numbers: tests/numbersmain.c lwp.o rr.o stack.o magic64.o
+	$(CC) $(CFLAGS) -I. tests/numbersmain.c \
+	    lwp.o rr.o stack.o magic64.o -o test_numbers
+
+test: test_rr test_stack test_create test_basic test_tid test_wait test_scheduler test_numbers
 	./test_rr
 	./test_stack
 	./test_create
@@ -60,6 +64,7 @@ test: test_rr test_stack test_create test_basic test_tid test_wait test_schedule
 	./test_tid
 	./test_wait
 	./test_scheduler
+	./test_numbers
 
 clean:
-	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create test_basic test_tid test_wait test_scheduler
+	rm -f $(OBJECTS) $(LIBRARY) test_rr test_stack test_create test_basic test_tid test_wait test_scheduler test_numbers
