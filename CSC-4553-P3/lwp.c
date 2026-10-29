@@ -261,7 +261,7 @@ tid_t lwp_create(lwpfun function, void *arg) {
     }
 
     static void remove_from_all_threads(thread victim) {
-        thread *current = &all threads;
+        thread *current = &all_threads;
         while (*current != NULL) {
             if (*current == victim) {
                 *current = victim->lib_one;
