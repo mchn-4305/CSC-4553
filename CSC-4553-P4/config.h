@@ -10,6 +10,6 @@
 #define PAGE_SHIFT 8
 #define ADDRESS_MASK 0xFFFF
 
-#define BACKING_STORE_FILE "BACKING_STORE.bin"
+#define BACKING_STORE_FILE "./files/BACKING_STORE.bin"
 
 #endif

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "config.h"
+#include "backing_store.h"
 
 
 static int *read_refs(const char *path, int *count) {
@@ -51,14 +52,27 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    if (bs_open(BACKING_STORE_FILE) != 0) {
+        perror(BACKING_STORE_FILE);
+        free(addrs);
+        return 1;
+    }
+
     int i;
     for (i = 0; i < n; i++) {
         int logical = addrs[i] & ADDRESS_MASK;
         int page = logical >> PAGE_SHIFT;
         int offset = logical & OFFSET_MASK;
+        signed char buf[PAGE_SIZE];
 
-        printf("addr %d -> page %d, offset %d\n", addrs[i], page, offset);
+        if (bs_read_page(page, buf) != 0) {
+            fprintf(stderr, "error reading page %d\n", page);
+            break;
+        }
+
+        printf("addr %d -> page %d, offset %d, value %d\n", addrs[i], page, offset, buf[offset]);
     }
     free(addrs);
+    bs_close();
     return 0;
 }
