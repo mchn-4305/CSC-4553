@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "config.h"
 #include "backing_store.h"
-
+#include "page_table.h"
 
 static int *read_refs(const char *path, int *count) {
     FILE *fp;
@@ -15,40 +15,43 @@ static int *read_refs(const char *path, int *count) {
     if (fp == NULL) {
         return NULL;
     }
+
     while (fscanf(fp, "%ld", &value) == 1) {
         if (n == cap) {
-            if (cap != 0) {
-                cap *= 2;
-            } else {
-                cap = 1024;
-            }
-            addrs = realloc(addrs, cap * sizeof(int));
-            if (addrs == NULL) {
+            int new_cap = cap ? cap * 2 : 1024;
+            int *temp = realloc(addrs, (size_t)new_cap * sizeof(*addrs));
+            if (temp == NULL) {
+                free(addrs);
                 fclose(fp);
                 return NULL;
             }
+            addrs = temp;
+            cap = new_cap;
         }
         addrs[n++] = (int)value;
     }
-    fclose(fp);
 
+    fclose(fp);
     *count = n;
     return addrs;
 }
 
-/*Usage: ./memsimulator <reference-sequence-file.txt> <FRAMES> <PRA>*/
+/* Milestone 2: only the 256-frame, no-replacement mode is implemented. */
 int main(int argc, char *argv[]) {
     int *addrs;
     int n = 0;
+    int i;
+    int result = 0;
+    PageTable pt;
 
-    if (argc < 2) {
-        fprintf(stderr, "Usage: ./memsimulator <reference-sequence-file.txt> <FRAMES> <PRA>\n");
+    if (argc != 2) {
+        fprintf(stderr, "Usage (milestone 2): %s <reference-sequence-file.txt>\n", argv[0]);
         return 1;
     }
 
     addrs = read_refs(argv[1], &n);
     if (addrs == NULL) {
-        perror(argv[1]);
+        fprintf(stderr, "Could not read address file: %s\n", argv[1]);
         return 1;
     }
 
@@ -58,21 +61,32 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    int i;
+    pt_init(&pt);
+
     for (i = 0; i < n; i++) {
         int logical = addrs[i] & ADDRESS_MASK;
         int page = logical >> PAGE_SHIFT;
         int offset = logical & OFFSET_MASK;
-        signed char buf[PAGE_SIZE];
+        int frame = pt_resolve(&pt, page);
+        int physical;
 
-        if (bs_read_page(page, buf) != 0) {
-            fprintf(stderr, "error reading page %d\n", page);
+        if (frame < 0) {
+            fprintf(stderr, "Error loading page %d\n", page);
+            result = 1;
             break;
         }
-
-        printf("addr %d -> page %d, offset %d, value %d\n", addrs[i], page, offset, buf[offset]);
+        physical = frame * PAGE_SIZE + offset;
+        printf("Virtual address: %d Physical address: %d Value: %d\n",
+               addrs[i], physical, (int)pt.memory[physical]);
     }
-    free(addrs);
+
+    if (result == 0) {
+        printf("Number of Translated Addresses = %d\n", n);
+        printf("Page Faults = %d\n", pt.page_faults);
+        printf("Page Fault Rate = %.3f\n", n ? (double)pt.page_faults / n : 0.0);
+    }
+
     bs_close();
-    return 0;
+    free(addrs);
+    return result;
 }
