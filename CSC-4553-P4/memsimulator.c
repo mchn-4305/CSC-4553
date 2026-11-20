@@ -4,6 +4,7 @@
 #include "backing_store.h"
 #include "page_table.h"
 #include "phys_mem.h"
+#include "tlb.h"
 
 static int *read_refs(const char *path, int *count) {
     FILE *fp;
@@ -45,6 +46,7 @@ int main(int argc, char *argv[]) {
     int result = 0;
     int page_faults = 0;
     PageTable pt;
+    TLB tlb;
     static PhysMem pm;
 
     if (argc != 2) {
@@ -65,6 +67,7 @@ int main(int argc, char *argv[]) {
     }
 
     pt_init(&pt);
+    tlb_init(&tlb);
 
     // Change when we implement frames as an argument
     pm_init(&pm, MAX_FRAME_SIZE);
@@ -73,7 +76,16 @@ int main(int argc, char *argv[]) {
         int logical = addrs[i] & ADDRESS_MASK;
         int page = logical >> PAGE_SHIFT;
         int offset = logical & OFFSET_MASK;
-        int frame = pt_lookup(&pt, page);
+        int frame = tlb_lookup(&tlb, page);
+
+        if (frame < 0) {
+            frame = pt_lookup(&pt, page);
+
+            if (frame >= 0) {
+                tlb_insert(&tlb, page, frame);
+            }
+        }
+
 
         if (frame < 0) {
             page_faults++;
@@ -90,6 +102,7 @@ int main(int argc, char *argv[]) {
                 break;
             }
             pt_set(&pt, page, frame);
+            tlb_insert(&tlb, page, frame);
         }
         
         signed char *bytes = pm_frame(&pm, frame);
@@ -105,10 +118,9 @@ int main(int argc, char *argv[]) {
         printf("Number of Translated Addresses = %d\n", n);
         printf("Page Faults = %d\n", page_faults);
         printf("Page Fault Rate = %.3f\n", n ? (double)page_faults / n : 0.0);
-        // TLB Info temporary (not implemented yet)
-        printf("TLB Hits = %d\n", 0);
-        printf("TLB Misses = %d\n", n);
-        printf("TLB Hit Rate = %.3f\n", 0.0);
+        printf("TLB Hits = %d\n", tlb.hits);
+        printf("TLB Misses = %d\n", tlb.misses);
+        printf("TLB Hit Rate = %.3f\n", n ? (double)tlb.hits / n : 0.0);
 
     }
 
