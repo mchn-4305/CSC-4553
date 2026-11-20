@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "config.h"
 #include "backing_store.h"
 #include "page_table.h"
@@ -38,7 +39,6 @@ static int *read_refs(const char *path, int *count) {
     return addrs;
 }
 
-/* Milestone 2: only the 256-frame, no-replacement mode is implemented. */
 int main(int argc, char *argv[]) {
     int *addrs;
     int n = 0;
@@ -49,15 +49,16 @@ int main(int argc, char *argv[]) {
     TLB tlb;
     static PhysMem pm;
     int frames = MAX_FRAME_SIZE;
+    // Temporary approach to policy choice
+    // 0 = FIFO, 1 = LRU
+    int use_lru = 0;
 
-    if (argc < 2 || argc > 3) {
-        fprintf(stderr,
-            "Usage: %s <reference-file> [FRAMES]\n",
-            argv[0]);
+    if (argc < 2 || argc > 4) {
+        fprintf(stderr, "Usage: %s <reference-file> [FRAMES] [fifo|lru]\n", argv[0]);
         return 1;
     }
 
-    if (argc == 3) {
+    if (argc >= 3) {
         char *end;
         long parsed = strtol(argv[2], &end, 10);
 
@@ -66,13 +67,22 @@ int main(int argc, char *argv[]) {
             parsed < 1 ||
             parsed > MAX_FRAME_SIZE) {
 
-            fprintf(stderr,
-                "FRAMES must be an integer from 1 to %d\n",
-                MAX_FRAME_SIZE);
+            fprintf(stderr, "FRAMES must be an integer from 1 to %d\n", MAX_FRAME_SIZE);
             return 1;
         }
 
         frames = (int)parsed;
+    }
+
+    if (argc == 4) {
+        if (strcmp(argv[3], "lru") == 0) {
+            use_lru = 1;
+        }
+        else if (strcmp(argv[3], "fifo") != 0) {
+            fprintf(stderr,
+                "PRA must be fifo or lru\n");
+            return 1;
+        }
     }
 
     addrs = read_refs(argv[1], &n);
@@ -107,8 +117,12 @@ int main(int argc, char *argv[]) {
 
                 frame = pm_get_frame(&pm);
 
-                if (frame < 0) {
-                    frame = pm_fifo_victim(&pm, &victim_page);
+                if (frame < 0) {       
+                    if (use_lru) {
+                        frame = pm_lru_victim(&pm, &victim_page);
+                    } else {
+                        frame = pm_fifo_victim(&pm, &victim_page);
+                    }
                 }
 
                 if (frame < 0) {
@@ -138,7 +152,7 @@ int main(int argc, char *argv[]) {
             tlb_insert(&tlb, page, frame);
         }
 
-        
+        pm_touch(&pm, frame);
         signed char *bytes = pm_frame(&pm, frame);
         int b;
         printf("%d, %d, %d, ", addrs[i], (int)pm_read(&pm, frame, offset), frame);
