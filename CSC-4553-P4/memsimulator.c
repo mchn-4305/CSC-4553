@@ -100,7 +100,6 @@ int main(int argc, char *argv[]) {
     pt_init(&pt);
     tlb_init(&tlb);
 
-    // Change when we implement frames as an argument
     pm_init(&pm, frames);
 
     for (i = 0; i < n; i++) {
