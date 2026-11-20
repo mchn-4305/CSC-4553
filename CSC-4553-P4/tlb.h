@@ -15,5 +15,6 @@ typedef struct {
 void tlb_init(TLB *tlb);
 int tlb_lookup(TLB *tlb, int page);
 void tlb_insert(TLB *tlb, int page, int frame);
+void tlb_invalidate(TLB *tlb, int page);
 
 #endif

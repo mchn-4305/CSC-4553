@@ -43,3 +43,14 @@ void tlb_insert(TLB *tlb, int page, int frame) {
 
     tlb->next_slot = (tlb->next_slot + 1) % TLB_SIZE;
 }
+
+void tlb_invalidate(TLB *tlb, int page) {
+    int i;
+
+    for (i = 0; i < TLB_SIZE; i++) {
+        if (tlb->pages[i] == page) {
+            tlb->pages[i] = -1;
+            tlb->frames[i] = -1;
+        }
+    }
+}

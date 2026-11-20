@@ -48,10 +48,31 @@ int main(int argc, char *argv[]) {
     PageTable pt;
     TLB tlb;
     static PhysMem pm;
+    int frames = MAX_FRAME_SIZE;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage (milestone 2): %s <reference-sequence-file.txt>\n", argv[0]);
+    if (argc < 2 || argc > 3) {
+        fprintf(stderr,
+            "Usage: %s <reference-file> [FRAMES]\n",
+            argv[0]);
         return 1;
+    }
+
+    if (argc == 3) {
+        char *end;
+        long parsed = strtol(argv[2], &end, 10);
+
+        if (*argv[2] == '\0' ||
+            *end != '\0' ||
+            parsed < 1 ||
+            parsed > MAX_FRAME_SIZE) {
+
+            fprintf(stderr,
+                "FRAMES must be an integer from 1 to %d\n",
+                MAX_FRAME_SIZE);
+            return 1;
+        }
+
+        frames = (int)parsed;
     }
 
     addrs = read_refs(argv[1], &n);
@@ -70,7 +91,7 @@ int main(int argc, char *argv[]) {
     tlb_init(&tlb);
 
     // Change when we implement frames as an argument
-    pm_init(&pm, MAX_FRAME_SIZE);
+    pm_init(&pm, frames);
 
     for (i = 0; i < n; i++) {
         int logical = addrs[i] & ADDRESS_MASK;
@@ -81,29 +102,42 @@ int main(int argc, char *argv[]) {
         if (frame < 0) {
             frame = pt_lookup(&pt, page);
 
-            if (frame >= 0) {
-                tlb_insert(&tlb, page, frame);
-            }
-        }
-
-
-        if (frame < 0) {
-            page_faults++;
-            frame = pm_get_frame(&pm);
             if (frame < 0) {
-                fprintf(stderr, "Out of frames (replacement not implemented yet)\n");
-                result = 1;
-                break;
+                int victim_page = -1;
+
+                frame = pm_get_frame(&pm);
+
+                if (frame < 0) {
+                    frame = pm_fifo_victim(&pm, &victim_page);
+                }
+
+                if (frame < 0) {
+                    fprintf(stderr,
+                        "Unable to allocate a frame\n");
+                    result = 1;
+                    break;
+                }
+
+                if (bs_read_page(page, pm_frame(&pm, frame)) != 0) {
+                    fprintf(stderr,
+                        "Error loading page %d\n", page);
+                    result = 1;
+                    break;
+                }
+
+                if (victim_page >= 0) {
+                    pt_invalidate(&pt, victim_page);
+                    tlb_invalidate(&tlb, victim_page);
+                }
+
+                pm_set_page(&pm, frame, page);
+                pt_set(&pt, page, frame);
+                page_faults++;
             }
-            
-            if (bs_read_page(page, pm_frame(&pm, frame)) != 0)  {
-                fprintf(stderr, "Error loading page %d\n", page);
-                result = 1;
-                break;
-            }
-            pt_set(&pt, page, frame);
+
             tlb_insert(&tlb, page, frame);
         }
+
         
         signed char *bytes = pm_frame(&pm, frame);
         int b;
