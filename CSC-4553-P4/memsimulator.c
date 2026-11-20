@@ -65,6 +65,8 @@ int main(int argc, char *argv[]) {
     }
 
     pt_init(&pt);
+
+    // Change when we implement frames as an argument
     pm_init(&pm, MAX_FRAME_SIZE);
 
     for (i = 0; i < n; i++) {
