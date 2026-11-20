@@ -3,6 +3,7 @@
 #include "config.h"
 #include "backing_store.h"
 #include "page_table.h"
+#include "phys_mem.h"
 
 static int *read_refs(const char *path, int *count) {
     FILE *fp;
@@ -42,7 +43,9 @@ int main(int argc, char *argv[]) {
     int n = 0;
     int i;
     int result = 0;
+    int page_faults = 0;
     PageTable pt;
+    static PhysMem pm;
 
     if (argc != 2) {
         fprintf(stderr, "Usage (milestone 2): %s <reference-sequence-file.txt>\n", argv[0]);
@@ -62,28 +65,49 @@ int main(int argc, char *argv[]) {
     }
 
     pt_init(&pt);
+    pm_init(&pm, MAX_FRAME_SIZE);
 
     for (i = 0; i < n; i++) {
         int logical = addrs[i] & ADDRESS_MASK;
         int page = logical >> PAGE_SHIFT;
         int offset = logical & OFFSET_MASK;
-        int frame = pt_resolve(&pt, page);
-        int physical;
+        int frame = pt_lookup(&pt, page);
 
         if (frame < 0) {
-            fprintf(stderr, "Error loading page %d\n", page);
-            result = 1;
-            break;
+            page_faults++;
+            frame = pm_get_frame(&pm);
+            if (frame < 0) {
+                fprintf(stderr, "Out of frames (replacement not implemented yet)\n");
+                result = 1;
+                break;
+            }
+            
+            if (bs_read_page(page, pm_frame(&pm, frame)) != 0)  {
+                fprintf(stderr, "Error loading page %d\n", page);
+                result = 1;
+                break;
+            }
+            pt_set(&pt, page, frame);
         }
-        physical = frame * PAGE_SIZE + offset;
-        printf("Virtual address: %d Physical address: %d Value: %d\n",
-               addrs[i], physical, (int)pt.memory[physical]);
+        
+        signed char *bytes = pm_frame(&pm, frame);
+        int b;
+        printf("%d, %d, %d, ", addrs[i], (int)pm_read(&pm, frame, offset), frame);
+        for (b = 0; b < PAGE_SIZE; b++) {
+            printf("%02X", (unsigned char) bytes[b]);
+        }
+        printf("\n");
     }
 
     if (result == 0) {
         printf("Number of Translated Addresses = %d\n", n);
-        printf("Page Faults = %d\n", pt.page_faults);
-        printf("Page Fault Rate = %.3f\n", n ? (double)pt.page_faults / n : 0.0);
+        printf("Page Faults = %d\n", page_faults);
+        printf("Page Fault Rate = %.3f\n", n ? (double)page_faults / n : 0.0);
+        // TLB Info temporary (not implemented yet)
+        printf("TLB Hits = %d\n", 0);
+        printf("TLB Misses = %d\n", n);
+        printf("TLB Hit Rate = %.3f\n", 0.0);
+
     }
 
     bs_close();

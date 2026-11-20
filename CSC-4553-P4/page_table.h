@@ -5,13 +5,11 @@
 
 typedef struct {
     int page_to_frame[NUM_PAGES];
-    signed char memory[NUM_PAGES * PAGE_SIZE];
-    int next_free_frame;
-    int page_faults;
 } PageTable;
 
 void pt_init(PageTable *pt);
-// Return the physical frame for page, or -1 on backing-store error.
-int pt_resolve(PageTable *pt, int page);
+int pt_lookup(PageTable *pt, int page);
+void pt_set(PageTable *pt, int page, int frame);
+void pt_invalidate(PageTable *pt, int page);
 
 #endif
