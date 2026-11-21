@@ -1,0 +1,23 @@
+0
+1
+256
+2
+257
+512
+3
+5
+1024
+1027
+
+-----------
+./memsimulator ./tests/tlb_tests.txt 256
+0 (page 0, frame 0) -> page fault
+1 (page 0, frame 0) -> tlb hit
+256 (page 1, frame 1) -> page fault/tlb miss
+2 (page 0, frame 0) -> tlb hit
+257 (page 1, frame 1) -> tlb hit
+512 (page 2, frame 2) -> page_fault/tlb miss
+3 (page 0, frame 0) -> tlb hit
+5 (page 0, frame 0) -> tlb hit
+1024 (page 4, frame 3) -> page fault/tlb miss
+1027 (page 4, frame 3) -> tlb hit

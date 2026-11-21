@@ -22,6 +22,7 @@ int pm_get_frame(PhysMem *pm);
 
 int pm_fifo_victim(PhysMem *pm, int *victim_page);
 int pm_lru_victim(PhysMem *pm, int *victim_page);
+int pm_opt_victim(PhysMem *pm, int *victim_page, const int *addrs, int n, int current);
 void pm_touch(PhysMem *pm, int frame);
 void pm_set_page(PhysMem *pm, int frame, int page);
 

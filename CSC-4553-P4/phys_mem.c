@@ -59,6 +59,42 @@ int pm_lru_victim(PhysMem *pm, int *victim_page) {
     return victim;
 }
 
+int pm_opt_victim(PhysMem *pm, int *victim_page, const int *addrs, int n, int current) {
+    int i, j;
+    int victim = -1;
+    int farthest = -1;
+
+    if (pm->next_available < pm->num_frames) {
+        return -1;
+    }
+
+    for (i = 0; i < pm->num_frames; i++) {
+        int page = pm->frame_to_page[i];
+        int next_use = n;
+        for (j = current + 1; j < n; j++) {
+            if (((addrs[j] & ADDRESS_MASK) >> PAGE_SHIFT) == page) {
+                next_use = j;
+                break;
+            }
+        }
+
+        if (next_use > farthest) {
+            farthest = next_use;
+            victim = i;
+        }
+
+        if (next_use == n) {
+            break;
+        }
+    }
+
+    if (victim >= 0) {
+        *victim_page = pm->frame_to_page[victim];
+    }
+
+    return victim;
+}
+
 void pm_touch(PhysMem *pm, int frame) {
     pm->access_clock++;
     pm->last_used[frame] = pm->access_clock;

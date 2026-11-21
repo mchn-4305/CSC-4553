@@ -50,11 +50,11 @@ int main(int argc, char *argv[]) {
     static PhysMem pm;
     int frames = MAX_FRAME_SIZE;
     // Temporary approach to policy choice
-    // 0 = FIFO, 1 = LRU
-    int use_lru = 0;
+    // 0 = FIFO, 1 = LRU, 2 = OPT
+    int policy = 0;
 
     if (argc < 2 || argc > 4) {
-        fprintf(stderr, "Usage: %s <reference-file> [FRAMES] [fifo|lru]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <reference-file> [FRAMES] [fifo|lru][opt]\n", argv[0]);
         return 1;
     }
 
@@ -75,12 +75,14 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc == 4) {
-        if (strcmp(argv[3], "lru") == 0) {
-            use_lru = 1;
-        }
-        else if (strcmp(argv[3], "fifo") != 0) {
-            fprintf(stderr,
-                "PRA must be fifo or lru\n");
+        if (strcmp(argv[3], "fifo") == 0) {
+            policy = 0;
+        } else if (strcmp(argv[3], "lru") == 0) {
+            policy = 1;
+        } else if (strcmp(argv[3], "opt") == 0) {
+            policy = 2;
+        } else {
+            fprintf(stderr, "PRA must be fifo, lru, or opt\n");
             return 1;
         }
     }
@@ -117,11 +119,13 @@ int main(int argc, char *argv[]) {
                 frame = pm_get_frame(&pm);
 
                 if (frame < 0) {       
-                    if (use_lru) {
+                    if (policy == 1) {
                         frame = pm_lru_victim(&pm, &victim_page);
+                    } else if (policy == 2) {
+                        frame = pm_opt_victim(&pm, &victim_page, addrs, n, i);
                     } else {
                         frame = pm_fifo_victim(&pm, &victim_page);
-                    }
+                    }   
                 }
 
                 if (frame < 0) {
